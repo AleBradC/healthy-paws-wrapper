@@ -1,0 +1,8 @@
+[submodule "healthy-paws-service"]
+	path = healthy-paws-service
+	url = https://github.com/AleBradC/healthy-paws-service.git
+	branch = dev
+[submodule "healty-paws-frontend"]
+	path = healty-paws-frontend
+	url = https://github.com/AleBradC/healty-paws-frontend.git
+	branch = dev
