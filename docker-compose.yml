@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    env_file:
+      - ./healthy-paws-service/.env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./healthy-paws-service/database.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - healthy-paws-network
+
+  backend:
+    build:
+      context: ./healthy-paws-service
+      target: development
+    env_file:
+      - ./healthy-paws-service/.env
+    environment:
+      - DB_HOST=db
+      - FRONTEND_URL=http://localhost
+    volumes:
+      - ./healthy-paws-service:/app
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - healthy-paws-network
+
+  frontend:
+    build:
+      context: ./healty-paws-frontend
+      target: development
+    volumes:
+      - ./healty-paws-frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - healthy-paws-network
+
+  gateway:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - healthy-paws-network
+
+networks:
+  healthy-paws-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
