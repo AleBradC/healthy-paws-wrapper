@@ -9,8 +9,11 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_DATABASE}
-    ports:
-      - "5432:5432"
+    # Postgres is reachable internally on the healthy-paws-network as
+    # `db:5432`. The port is intentionally not published to the host —
+    # uncomment the block below only for one-off local debugging.
+    # ports:
+    #   - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./healthy-paws-service/database.sql:/docker-entrypoint-initdb.d/init.sql
