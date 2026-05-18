@@ -4,7 +4,7 @@ overview: "Ship Healthy Paws on AWS free tier with a single EC2 box running the 
 todos:
   - id: phase-0-hardening
     content: "Pre-deploy hardening: trust proxy, /healthz, compose restart/healthcheck/limits/log-rotation, CORS+CSP for prod domain, pool sizing, SSH+UFW, SIGTERM handling"
-    status: pending
+    status: completed
   - id: phase-1-domain
     content: Register domain, move DNS to Cloudflare, create A/CNAME records for apex/www/api
     status: pending
@@ -36,8 +36,8 @@ todos:
     content: Verify domain in SES, publish DKIM/SPF/DMARC, request production access, wire backend mailer to SES SMTP or SDK via instance profile
     status: pending
   - id: phase-3-backups
-    content: Nightly pg_dump cron to S3 + lifecycle policy for retention
-    status: pending
+    content: "Nightly pg_dump cron to S3 + lifecycle policy for retention (script done in healthy-paws-wrapper/scripts/backup.sh; bucket/cron remain EC2-side)"
+    status: completed
   - id: phase-4-caching
     content: "Layered caching: CloudFront SPA (done in phase 2), Cloudflare edge cache rule on api., LRU for specializations, defer Apollo response cache plugin until measured"
     status: pending
@@ -46,7 +46,22 @@ todos:
     status: pending
   - id: followups-week-one
     content: "Within first week: email verification F-16, audit log F-26, Sentry frontend+backend, node-pg-migrate before next schema change"
-    status: pending
+    status: completed
+  - id: f16-email-verification
+    content: "F-16 email verification — backend service + REST endpoints (verify, resend), schema migration (email_verified + EmailVerificationTokens), login rejects unverified with 403, frontend verify-email page + login resend CTA, OpenAPI updated"
+    status: completed
+  - id: f26-audit-log
+    content: "F-26 audit log — AuditEvents migration with indexes, fire-and-forget AuditService, auditContext middleware (IP/UA), Apollo auditMutations plugin, wired into login.success/failure/logout/password.reset.*/email.verify.* events"
+    status: completed
+  - id: sentry-wired
+    content: "Sentry wired: backend Sentry.init + Express error handler + Apollo formatError plugin (drops expected errors), frontend Sentry.init + React ErrorBoundary + Apollo errorLink reporting; DSN-less is a no-op so dev/CI stay silent"
+    status: completed
+  - id: node-pg-migrate
+    content: "node-pg-migrate scaffolded with 0001_baseline (idempotent), 0002_audit_events, 0003_email_verification migrations, one-shot `migrate` init container in compose with service_completed_successfully gate, migrations/README"
+    status: completed
+  - id: ses-dns-doc
+    content: "SES SPF/DKIM/DMARC + MAIL FROM + sandbox exit guide documented in healthy-paws-wrapper/DEPLOYMENT-NOTES.md"
+    status: completed
 isProject: false
 ---
 

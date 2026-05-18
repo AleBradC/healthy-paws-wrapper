@@ -29,6 +29,31 @@ services:
     networks:
       - healthy-paws-network
 
+  # One-shot init container. Applies any new node-pg-migrate migrations and
+  # exits 0. The backend depends on it with `condition: service_completed_successfully`
+  # so it cannot boot against an out-of-date schema. Re-runs on every
+  # `docker compose up` — `node-pg-migrate` skips already-applied migrations.
+  migrate:
+    build:
+      context: ./healthy-paws-service
+      target: development
+    env_file:
+      - ./healthy-paws-service/.env
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_DATABASE}
+    command: ["npm", "run", "migrate:up"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *json_logging
+    networks:
+      - healthy-paws-network
+
   backend:
     build:
       context: ./healthy-paws-service
@@ -44,6 +69,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     # /healthz hits the DB with a 1s timeout; 5s interval keeps the loop
     # cheap. Start period covers `npm install` on first dev boot.
