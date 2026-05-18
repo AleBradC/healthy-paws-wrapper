@@ -1,0 +1,30 @@
+Backend (healthy-paws-service)
+node-pg-migrate — migrations/0001_baseline.cjs (idempotent baseline mirroring database.sql), 0002_audit_events.cjs, 0003_email_verification.cjs; .pgmigraterc.json; migrate* scripts in package.json; migrations/README.md.
+
+F-26 audit log — new src/features/audit/ (service + repository + types + singleton + tests). Service is fire-and-forget (never throws — failures land in Sentry). src/core/middleware/audit-context.ts attaches IP/UA to every request. src/schema/plugins/auditMutations.ts logs every GraphQL mutation outcome with classification (success / failure / denied). Wired into auth controller for login.success, login.failure (including the unverified-403 variant), logout, password.reset.requested, password.reset.completed, email.verify.*.
+
+F-16 email verification — new src/features/email-verification/ (repository + service + controller + routes + Zod helpers). 32-byte token, SHA-256 hash persisted, 24h expiry. Registration now silently dispatches a verification email after account creation. validateUser returns a discriminated union; login returns 401 INVALID_CREDENTIALS for wrong passwords (enumeration-safe) and 403 EMAIL_NOT_VERIFIED only when the password matched. New endpoints POST /api/auth/verify-email (resetLimiter) and POST /api/auth/resend-verification (sendCodeLimiter). Both documented in the OpenAPI spec. New verification email template.
+
+Sentry — src/core/observability/sentry.ts (DSN-less = no-op). Sentry.setupExpressErrorHandler runs before globalErrorHandler; SystemErrors captured with originalError for clean grouping. New src/schema/plugins/sentryPlugin.ts drops expected GraphQL codes (UNAUTHENTICATED, FORBIDDEN, BAD_USER_INPUT, etc.) and ships only real bugs.
+
+Frontend (healty-paws-frontend)
+Sentry — src/lib/observability/sentry.ts, init at top of main.tsx, Sentry.ErrorBoundary wrapping <App>, Apollo errorLink ships unhandled errors with operation context (excluding UNAUTHENTICATED / FORBIDDEN / BAD_USER_INPUT / EMAIL_NOT_VERIFIED).
+
+Verify-email flow — src/pages/auth/verify-email/VerifyEmailPage.tsx (consumes ?token, falls back to a resend form). Route mounted outside PublicRoute (logged-in users opening a link from a second signup still need to land there). RegistrationSuccessPage rewritten to "Check your email". LoginPage detects 403 and surfaces a one-click "Resend verification email" CTA. RegistrationSuccessPage.test.tsx updated to match the new copy.
+
+Wrapper (healthy-paws-wrapper)
+One-shot migrate init container in docker-compose.yml. backend now depends on migrate: service_completed_successfully, so it can't boot against an out-of-date schema.
+scripts/backup.sh — nightly pg_dump → gzip → S3 (SSE-AES256), with sanity check and local retention prune.
+DEPLOYMENT-NOTES.md — SPF/DKIM/DMARC/MAIL FROM records, SES sandbox exit, Sentry env vars, backup cron entry, migration day-to-day commands.
+Verification
+Backend: tsc --noEmit clean, 61/61 tests pass (added audit + registration + verification coverage).
+Frontend: tsc --noEmit clean, 379/379 tests pass.
+docker compose config validates cleanly with the new migrate service and dependency wiring.
+One thing to be aware of
+I noticed healthy-paws-wrapper/healthy-paws-service and healthy-paws-wrapper/healty-paws-frontend are git submodules pointing at separate repos. All edits in this session went to the root-level working copies (/Users/alexandra.brad/Downloads/Project/healthy-paws-service and /.../healty-paws-frontend), matching how earlier sessions worked. To actually run inside the wrapper containers, you'll need to commit these in the standalone repos and bump the submodule pointers in the wrapper — or run docker compose against the standalone repos via path overrides.
+
+What's still external (can't be done from code)
+Creating the Sentry projects and pasting SENTRY_DSN / VITE_SENTRY_DSN into the EC2 .env and the frontend build env.
+Publishing the SES DNS records at Cloudflare and requesting SES production access.
+Creating the S3 backup bucket + IAM instance role + crontab entry on EC2.
+All three are walk-throughed in healthy-paws-wrapper/DEPLOYMENT-NOTES.md.
