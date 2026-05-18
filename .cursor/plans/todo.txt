@@ -1,0 +1,8 @@
+Suggested next move
+Start executing the simple plan in this order:
+
+s01-s05 — code prep on your laptop. Independent of AWS; safe to do today.
+s06-s09 — account signups and the domain purchase. Each takes ~5 min.
+s10-s20 — AWS infra + first deploy. Block out a 2-3 hour evening.
+Once the app is live, treat the advanced plan as a snack menu — pick one item, learn it, ship it, move on.
+

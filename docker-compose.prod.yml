@@ -1,0 +1,114 @@
+services:
+  db:
+    image: postgres:15-alpine
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    logging: &json_logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - healthy-paws-network
+
+  # One-shot init container that runs node-pg-migrate up and exits 0.
+  # Uses the same production image as the backend so we don't ship a build
+  # toolchain to production. The backend depends on its completion so it
+  # cannot boot against an out-of-date schema.
+  migrate:
+    image: healthy-paws-service:latest
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_DATABASE}
+    command: ["npx", "node-pg-migrate", "up"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *json_logging
+    networks:
+      - healthy-paws-network
+
+  backend:
+    # Image is built on the EC2 box itself from the cloned healthy-paws-service
+    # repo (see simple_aws_deploy plan, step s16). Tag stays at :latest so the
+    # update flow is `git pull && docker build -t healthy-paws-service:latest
+    # . && docker compose up -d backend`. Switch to a GHCR-pulled image
+    # (advanced_extras x01) once you set up the backend GHA pipeline.
+    image: healthy-paws-service:latest
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 400M
+    logging: *json_logging
+    networks:
+      - healthy-paws-network
+
+  # In production the SPA is served as static files from a volume mount, not
+  # from a Vite dev server. The frontend build (`npm run build`) is scp'd
+  # onto the box into ./nginx/spa/. nginx terminates TLS with the Cloudflare
+  # Origin Certificate mounted from ./nginx/certs/.
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/spa:/usr/share/nginx/spa:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    logging: *json_logging
+    networks:
+      - healthy-paws-network
+
+networks:
+  healthy-paws-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

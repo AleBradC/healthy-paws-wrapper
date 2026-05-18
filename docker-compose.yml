@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:15-alpine
     env_file:
-      - ./healthy-paws-service/.env
+      - ../healthy-paws-service/.env
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -14,7 +14,7 @@ services:
     #   - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./healthy-paws-service/database.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../healthy-paws-service/database.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
@@ -35,10 +35,10 @@ services:
   # `docker compose up` — `node-pg-migrate` skips already-applied migrations.
   migrate:
     build:
-      context: ./healthy-paws-service
+      context: ../healthy-paws-service
       target: development
     env_file:
-      - ./healthy-paws-service/.env
+      - ../healthy-paws-service/.env
     environment:
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_DATABASE}
     command: ["npm", "run", "migrate:up"]
@@ -56,15 +56,15 @@ services:
 
   backend:
     build:
-      context: ./healthy-paws-service
+      context: ../healthy-paws-service
       target: development
     env_file:
-      - ./healthy-paws-service/.env
+      - ../healthy-paws-service/.env
     environment:
       - DB_HOST=db
       - FRONTEND_URL=http://localhost
     volumes:
-      - ./healthy-paws-service:/app
+      - ../healthy-paws-service:/app
       - /app/node_modules
     depends_on:
       db:
@@ -90,10 +90,10 @@ services:
 
   frontend:
     build:
-      context: ./healty-paws-frontend
+      context: ../healty-paws-frontend
       target: development
     volumes:
-      - ./healty-paws-frontend:/app
+      - ../healty-paws-frontend:/app
       - /app/node_modules
     depends_on:
       - backend

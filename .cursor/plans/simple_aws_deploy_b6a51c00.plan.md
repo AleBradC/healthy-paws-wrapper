@@ -111,6 +111,21 @@ Resources you will create:
 
 Nothing else. No ALB, no RDS, no CloudFront, no SES, no second S3 bucket for the SPA, no Route 53.
 
+### Where each piece physically lives
+
+In plain English: **one VM hosts all three tiers** (frontend static files, backend API, Postgres DB). The only AWS resource beyond the VM is the S3 bucket for avatar uploads and the IAM role that lets the VM write to it. Domain + TLS + WAF go through Cloudflare.
+
+| Tier | Where it runs | How it gets there |
+|---|---|---|
+| **Frontend (React SPA)** | Static files inside the nginx container on EC2, served from `/usr/share/nginx/spa` | Run `npm run build` on your laptop (step **s17**), then `scp` the `dist/` folder to `/opt/healthy-paws/nginx/spa/` on EC2 (plan section F2) |
+| **Backend (Node/Apollo)** | Docker container on EC2, image `healthy-paws-service:latest` | Built on the EC2 box from a `git clone` of the service repo (step **s16**), then `docker compose -f docker-compose.prod.yml up -d` |
+| **Database (Postgres)** | Docker container on the **same** EC2, alongside the backend | Started by the same `docker compose up -d` (step **s19**); data persisted in the `pg_data` named volume |
+| **S3 avatars bucket** | AWS S3 (separate resource, not on the VM) | Created in step **s10** (deferred while s05 is parked) |
+| **DNS + TLS + WAF** | Cloudflare (free) | Domain + zone in step **s09**, Origin Cert in step **s14**, DNS records in step **s15** |
+| **Email** | Resend SaaS (free) | API key in step **s08**; `RESEND_API_KEY` baked into the EC2 `.env` in step **s19** |
+
+The single-VM design is intentional for a uni project — it's the cheapest, simplest layout and fits comfortably in AWS Free Tier for the first 12 months. If you later want to split the frontend off onto its own free hosting (Cloudflare Pages, Vercel, Netlify) so EC2 only carries the backend + DB, that swap is documented in [advanced_extras_5e44ab10.plan.md](healthy-paws-wrapper/.cursor/plans/advanced_extras_5e44ab10.plan.md) section G1.
+
 ---
 
 ## A. Local code prep (do these BEFORE touching AWS)
