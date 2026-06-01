@@ -9,6 +9,7 @@ services:
       POSTGRES_DB: ${DB_DATABASE}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../healthy-paws-service/database.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
@@ -27,29 +28,6 @@ services:
     networks:
       - healthy-paws-network
 
-  # One-shot init container that runs node-pg-migrate up and exits 0.
-  # Uses the same production image as the backend so we don't ship a build
-  # toolchain to production. The backend depends on its completion so it
-  # cannot boot against an out-of-date schema.
-  migrate:
-    image: healthy-paws-service:latest
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_DATABASE}
-    command: ["npx", "node-pg-migrate", "up"]
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: "no"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    logging: *json_logging
-    networks:
-      - healthy-paws-network
-
   backend:
     # Image is built on the EC2 box itself from the cloned healthy-paws-service
     # repo (see simple_aws_deploy plan, step s16). Tag stays at :latest so the
@@ -64,8 +42,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
