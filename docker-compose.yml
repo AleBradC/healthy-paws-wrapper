@@ -68,6 +68,8 @@ services:
     volumes:
       - ../healty-paws-frontend:/app
       - /app/node_modules
+    environment:
+      - VITE_CACHE_DIR=/tmp/.vite
     depends_on:
       - backend
     restart: unless-stopped
